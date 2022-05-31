@@ -20,6 +20,7 @@ export default function ({
     const [cameraX, setCameraX] = useState(longitude);
     const [cameraY, setCameraY] = useState(latitude);
     const [cameraScale, setCameraScale] = useState(100);
+    const [cameraRotation, setCameraRotation] = useState(0);
     const [referencePositions, setReferencePositions] = useState();
     const svgRef = useRef(null);
     // const [coords, setCoords] = useState()
@@ -67,68 +68,17 @@ export default function ({
       
     }, [html]);
 
-    const projection = useMemo(() => {
-        let newProjection = geoMercator()
-            .scale(cameraScale)
-            .center([cameraX, cameraY])
-        // newProjection
-            // .clipExtent([[0, 0], [width, height]])
+    const [projection, projectionWithoutRotation] = useMemo(() => {
+        const newProjection = geoMercator()
+          .angle(cameraRotation)
+          .scale(cameraScale)
+          .center([cameraX, cameraY]);
+        const newProjectionWithoutRotation = geoMercator()
+          .scale(cameraScale)
+          .center([cameraX, cameraY])
 
-        // newProjection.translate([0, 0])
-        console.log('projection : ', newProjection.translate())
-
-        return newProjection;
-    }, [cameraX, cameraY, cameraScale])
-
-    // useEffect(() => {
-    //     if (!geoObject) { return; }
-    //     const offset = [width / 2, height / 2];
-    //     // const center = geoCentroid(geoObject)
-
-    //     let newProjection = geoMercator()
-    //         .scale(scale)
-    //         .center([x, y])
-            // .center(center)
-            // .translate(offset)
-
-        // const bounds = path.bounds(geoObject);
-        // console.log(bounds);
-
-        // console.log(path(longitude, latitude));
-        
-        // newProjection
-            // .translate([x, y])
-            // .fitExtent([[0, 0], [width, height]], geoObject);
-
-        // newProjection
-        //     .fitSize([width, height], geoObject)
-            // .center([x, y])
-            // .scale(scale)
-            // .translate([x, y]);
-        // setCoords(newProjection([longitude, latitude]))
-
-        // setCoords(newProjection([longitude, latitude]))
-        // console.log(newProjection([longitude, latitude]));
-        // newProjection.scale(scale).translate([x, y])
-        // console.log(newProjection([longitude, latitude]));
-    // }, [geoObject, x, y, scale]);
-
-    // useEffect(() => {
-    //     if (!projection) { return }
-    //     console.log(projection);
-    // }, [projection])
-
-    // const transform = useMemo(() => {
-    //     return `translate(${x} ${y})`
-    // }, [x, y]);
-
-    // useEffect(() => {
-    //     console.log(x);
-    // }, [x])
-
-    // https://github.com/d3/d3-geo#projection_scale
-    // https://github.com/d3/d3-geo#projection_translate
-    // https://stackoverflow.com/questions/62228556/reactjs-d3-how-to-zoom-in-d3-geo-world-map
+        return [newProjection, newProjectionWithoutRotation];
+    }, [cameraX, cameraY, cameraScale, cameraRotation])
 
     if (!html || !geoObject || !referencePositions) {
         return <>Coucou</>;
@@ -144,29 +94,23 @@ export default function ({
 
     const geoGenerator = geoPath(projection);
 
+    const INITIAL_SCALE = 100;
     const firstPointReference = referencePositions[0];
     const {x: initialX, y: initialY, latitude: referenceLatitude, longitude: referenceLongitude} = firstPointReference;
-    const [newX, newY] = projection([referenceLatitude, referenceLongitude]);
+    const [newX, newY] = projectionWithoutRotation([referenceLatitude, referenceLongitude]);
+    const scaleFactor = cameraScale / INITIAL_SCALE;
 
-
+    const svgTransform = `rotate(${-cameraRotation})translate(${newX - initialX}, ${newY - initialY})scale(${scaleFactor})`;
     // console.log('dom element', Array.from(domElement.children[0].children).map(c => c.outerHTML).join('\n'))
-
 
     return (
         <>
-            {/* <div
-                style={style}
-                ref={svgRef}
-                dangerouslySetInnerHTML={{
-                    __html: html
-                }}
-            /> */}
             <div
                 style={style}
                 ref={svgRef}
             >
               <svg width={960} height={500}
-              transform={`translate(${newX - initialX}, ${newY - initialY})`}
+              transform={svgTransform}
 
                 dangerouslySetInnerHTML={{
                   __html: svgContent
@@ -174,6 +118,7 @@ export default function ({
 
               />
             </div>
+
 
             <svg
                 width={960}
@@ -183,11 +128,11 @@ export default function ({
             // transform={transform}
             >
               <rect x={0} y={0} width={960} height={500} fill="none" stroke="red" />
-              {
-                geoObject.features.map((feature, featureIndex) => {
-                  return <path key={featureIndex} d={geoGenerator(feature)} fill="none" stroke="red" />
-                })
-              }
+                {
+                  geoObject.features.map((feature, featureIndex) => {
+                    return <path key={featureIndex} d={geoGenerator(feature)} fill="none" stroke="red" />
+                  })
+                }
                 <circle cx={projection(newyorkCoords)[0]} cy={projection(newyorkCoords)[1]} r={5 +  1 / cameraScale} fill='blue'></circle>
                 <circle cx={projection([0, 0])[0]} cy={projection([0, 0])[1]} r={5 +  1 / cameraScale} fill='green'></circle>
             </svg>
@@ -199,9 +144,13 @@ export default function ({
                 <button onClick={() => setCameraY(cameraY + range * 10)}>Bas</button>
                 <button onClick={() => setCameraScale(cameraScale + range)}>Zoom</button>
                 <button onClick={() => setCameraScale(cameraScale - range)}>De-zoom</button>
+                <button onClick={() => setCameraRotation(cameraRotation + 1)}>Pivoter vers la gauche</button>
+                <button onClick={() => setCameraRotation(cameraRotation - 1)}>Pivoter vers la droite</button>
                 <ul>
                   <li>centre de la  projection (ln/lg) : [{cameraX}, {cameraY}]</li>
                   <li>scale de la projection : {cameraScale}</li>
+                  <li>rotation : {cameraRotation}°</li>
+                  <li>Transform : <code>{svgTransform}</code></li>
                 </ul>
             </div>
         </>

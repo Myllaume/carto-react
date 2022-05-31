@@ -10,6 +10,6 @@ root.render(
   <React.StrictMode>
     {/* <App /> */}
     <Point />
-    <GenerateSVG />
+    {/* <GenerateSVG /> */}
   </React.StrictMode>
 );
