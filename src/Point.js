@@ -21,7 +21,7 @@ export default function ({
     const [cameraY, setCameraY] = useState(latitude);
     const [cameraScale, setCameraScale] = useState(100);
     const [cameraRotation, setCameraRotation] = useState(0);
-    const [referencePositions, setReferencePositions] = useState();
+    // const [referencePositions, setReferencePositions] = useState();
     const svgRef = useRef(null);
     // const [coords, setCoords] = useState()
     // const longitude = 2.3266688; // médialab
@@ -42,15 +42,15 @@ export default function ({
         .then(str => {
           setHtml(str);
           console.log('got html')
-          return fetchDataCsv('reference_positions.csv')
+          // return fetchDataCsv('reference_positions.csv')
         })
-        .then(csv => {
-          const cleanCsv = csv.map(obj => Object.entries(obj).reduce((res, [key, val]) => ({
-            ...res,
-            [key]: +val
-          }), {}));
-          setReferencePositions(cleanCsv)
-        })
+        // .then(csv => {
+        //   const cleanCsv = csv.map(obj => Object.entries(obj).reduce((res, [key, val]) => ({
+        //     ...res,
+        //     [key]: +val
+        //   }), {}));
+        //   setReferencePositions(cleanCsv)
+        // })
     }, []);
 
     useEffect(function getGeoObject() {
@@ -80,7 +80,8 @@ export default function ({
         return [newProjection, newProjectionWithoutRotation];
     }, [cameraX, cameraY, cameraScale, cameraRotation])
 
-    if (!html || !geoObject || !referencePositions) {
+    if (!html || !geoObject) {
+    // if (!html || !geoObject || !referencePositions) {
         return <>Coucou</>;
     }
 
@@ -90,13 +91,17 @@ export default function ({
         left: '0px'
     }
 
-    console.log('point position in pixels : ', projection(newyorkCoords))
-
     const geoGenerator = geoPath(projection);
 
     const INITIAL_SCALE = 100;
-    const firstPointReference = referencePositions[0];
-    const {x: initialX, y: initialY, latitude: referenceLatitude, longitude: referenceLongitude} = firstPointReference;
+    const initialX = 480,
+          initialY = 250,
+          referenceLatitude = 0,
+          referenceLongitude = 0;
+          
+    // uncomment if use of CSV
+    // const firstPointReference = referencePositions[0];
+    // const {x: initialX, y: initialY, latitude: referenceLatitude, longitude: referenceLongitude} = firstPointReference;
     const [newX, newY] = projectionWithoutRotation([referenceLatitude, referenceLongitude]);
     const scaleFactor = cameraScale / INITIAL_SCALE;
 
@@ -140,8 +145,8 @@ export default function ({
             <div style={style}>
               <button onClick={() => setCameraX(cameraX + range * 10)}>Gauche</button>
                 <button onClick={() => setCameraX(cameraX - range * 10)}>Droite</button>
-                <button onClick={() => setCameraY(cameraY - range * 10)}>Haut</button>
-                <button onClick={() => setCameraY(cameraY + range * 10)}>Bas</button>
+                <button onClick={() => setCameraY(cameraY + range * 10)}>Haut</button>
+                <button onClick={() => setCameraY(cameraY - range * 10)}>Bas</button>
                 <button onClick={() => setCameraScale(cameraScale + range)}>Zoom</button>
                 <button onClick={() => setCameraScale(cameraScale - range)}>De-zoom</button>
                 <button onClick={() => setCameraRotation(cameraRotation + 1)}>Pivoter vers la gauche</button>
