@@ -35,7 +35,7 @@ export default function ({
   const newyorkCoords = [-74.005941, 40.712784]
   // const newyorkCoords = [0, 0]
 
-  const [html, setHtml] = useState(undefined);
+  const [svgData, setSVGData] = useState(undefined);
   const [geoObject, setGeoObject] = useState(undefined);
   const [cameraX, setCameraX] = useState(longitude);
   const [cameraY, setCameraY] = useState(latitude);
@@ -61,8 +61,8 @@ export default function ({
   useEffect(() => {
     fetchDataSvg('world_map_960x500.svg')
       .then(str => {
-        setHtml(str);
-        console.log('got html')
+        setSVGData(str);
+        // uncomment if reference point csv is used
         // return fetchDataCsv('reference_positions.csv')
       })
     // .then(csv => {
@@ -80,15 +80,37 @@ export default function ({
     })
   }, [cameraX, cameraY, cameraScale]);
 
+  const style = {
+    position: 'fixed',
+    top: '0px',
+    left: '0px'
+  }
 
-  const svgContent = useMemo(() => {
-    if (html) {
-      const domElement = new DOMParser().parseFromString(html, 'text/xml');
-      return Array.from(domElement.children[0].children).map(c => c.outerHTML).join('\n');
-    }
+  /**
+   * Actual industrializable code starts here
+   */
 
-  }, [html]);
-
+  /**
+   * We will use directly the content of the svg
+   */
+   const svgContent = useMemo(() => {
+    const extractSVGContentRegexp = /<svg[^>]+>([\s\S]*)<\/svg>/gm;
+    if (svgData) {
+       const match = extractSVGContentRegexp.exec(svgData);
+       if (match) {
+         return match[1].trim()
+       }
+     }
+ 
+   }, [svgData]);
+  /**
+   * Compute projection with actual parameters
+   * We have to compute two projections because we need to 
+   * use one without rotation params as it is simpler to handle rotation
+   * directly with a "rotate" transform equal to the "angle" projection params.
+   * Alternative would be to use a two-reference-points strategy
+   * that would probably include polar-to-cartesian operations.
+   */
   const [projection, projectionWithoutRotation] = useMemo(() => {
     const newProjection = geoMercator()
       .angle(cameraRotation)
@@ -100,35 +122,38 @@ export default function ({
 
     return [newProjection, newProjectionWithoutRotation];
   }, [cameraX, cameraY, cameraScale, cameraRotation])
+   const geoGenerator = geoPath(projection);
+   // scale as set in the svg generation step
+   const INITIAL_SCALE = 100;
+   // position of the null island in the background svg
+   // x, y in pixels
+   const initialX = 480,
+     initialY = 250,
+     // latitude and longitude of the null island
+     referenceLatitude = 0,
+     referenceLongitude = 0;
+ 
+   // uncomment if use of the reference points CSV !
+   // It is commented as we actually need only one ref point, so its data is hard-coded above (initialX, ...)
+   // const firstPointReference = referencePositions[0];
+   // const {x: initialX, y: initialY, latitude: referenceLatitude, longitude: referenceLongitude} = firstPointReference;
+   
+   // 1. we compute new screen coordinates of the null island
+   const [newX, newY] = projectionWithoutRotation([referenceLatitude, referenceLongitude]);
+   // we will add a translate transform to the svg to match the displacement between original and new position of the null island
+   const svgTranslateX = newX - initialX;
+   const svgTranslateY = newY - initialY;
+ 
+   // we will add a scale equal to the ratio between initial svg projection scale and new scale
+   const scaleFactor = cameraScale / INITIAL_SCALE;
+   // svg transform includes the camera rotation (in °) and the translation + scaling
+   const svgTransform = `rotate(${-cameraRotation})translate(${svgTranslateX}, ${svgTranslateY})scale(${scaleFactor})`; 
 
-  if (!html || !geoObject) {
-    // if (!html || !geoObject || !referencePositions) {
-    return <>Coucou</>;
+  if (!svgContent || !geoObject) {
+    return <>Loading</>;
   }
 
-  const style = {
-    position: 'fixed',
-    top: '0px',
-    left: '0px'
-  }
-
-  const geoGenerator = geoPath(projection);
-
-  const INITIAL_SCALE = 100;
-  const initialX = 480,
-    initialY = 250,
-    referenceLatitude = 0,
-    referenceLongitude = 0;
-
-  // uncomment if use of CSV
-  // const firstPointReference = referencePositions[0];
-  // const {x: initialX, y: initialY, latitude: referenceLatitude, longitude: referenceLongitude} = firstPointReference;
-  const [newX, newY] = projectionWithoutRotation([referenceLatitude, referenceLongitude]);
-  const scaleFactor = cameraScale / INITIAL_SCALE;
-
-  const svgTransform = `rotate(${-cameraRotation})translate(${newX - initialX}, ${newY - initialY})scale(${scaleFactor})`;
-  // console.log('dom element', Array.from(domElement.children[0].children).map(c => c.outerHTML).join('\n'))
-
+  
   return (
     <>
       <div
